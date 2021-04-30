@@ -183,6 +183,26 @@ class Code2VecModel(Code2VecModelBase):
                 pass  # reader iterator is exhausted and have no more batches to produce.
             self.log('Done evaluating, epoch reached')
             log_output_file.write(str(topk_accuracy_evaluation_metric.topk_correct_predictions) + '\n')
+            print('Precision @1: '+ str(subtokens_evaluation_metric.precision_total_1/subtokens_evaluation_metric.nr_predictions))
+            print('Precision @2: '+ str(subtokens_evaluation_metric.precision_total_2/subtokens_evaluation_metric.nr_predictions))
+            print('Precision @3: '+ str(subtokens_evaluation_metric.precision_total_3/subtokens_evaluation_metric.nr_predictions))
+            print('Precision @4: '+ str(subtokens_evaluation_metric.precision_total_4/subtokens_evaluation_metric.nr_predictions))
+            print('Precision @5: '+ str(subtokens_evaluation_metric.precision_total_5/subtokens_evaluation_metric.nr_predictions))
+            print('Recall @1: '+ str(subtokens_evaluation_metric.recall_total_1/subtokens_evaluation_metric.nr_predictions))
+            print('Recall @2: '+ str(subtokens_evaluation_metric.recall_total_2/subtokens_evaluation_metric.nr_predictions))
+            print('Recall @3: '+ str(subtokens_evaluation_metric.recall_total_3/subtokens_evaluation_metric.nr_predictions))
+            print('Recall @4: '+ str(subtokens_evaluation_metric.recall_total_4/subtokens_evaluation_metric.nr_predictions))
+            print('Recall @5: '+ str(subtokens_evaluation_metric.recall_total_5/subtokens_evaluation_metric.nr_predictions))
+            print('F1 @1: '+ str(f1(subtokens_evaluation_metric.precision_total_1/subtokens_evaluation_metric.nr_predictions,
+                                    subtokens_evaluation_metric.recall_total_1/subtokens_evaluation_metric.nr_predictions)))
+            print('F1 @2: '+ str(f1(subtokens_evaluation_metric.precision_total_2/subtokens_evaluation_metric.nr_predictions,
+                                    subtokens_evaluation_metric.recall_total_2/subtokens_evaluation_metric.nr_predictions)))
+            print('F1 @3: '+ str(f1(subtokens_evaluation_metric.precision_total_3/subtokens_evaluation_metric.nr_predictions,
+                                    subtokens_evaluation_metric.recall_total_3/subtokens_evaluation_metric.nr_predictions)))
+            print('F1 @4: '+ str(f1(subtokens_evaluation_metric.precision_total_4/subtokens_evaluation_metric.nr_predictions,
+                                    subtokens_evaluation_metric.recall_total_4/subtokens_evaluation_metric.nr_predictions)))
+            print('F1 @5: '+ str(f1(subtokens_evaluation_metric.precision_total_5/subtokens_evaluation_metric.nr_predictions,
+                                    subtokens_evaluation_metric.recall_total_5/subtokens_evaluation_metric.nr_predictions)))
         if self.config.EXPORT_CODE_VECTORS:
             code_vectors_file.close()
         
@@ -446,6 +466,8 @@ class Code2VecModel(Code2VecModelBase):
             tf.compat.v1.tables_initializer()))
         self.log('Initalized variables')
 
+def f1(precision, recall):
+    return 2*(precision*recall)/(precision+recall)
 
 class SubtokensEvaluationMetric:
     def __init__(self, filter_impossible_names_fn):
@@ -455,11 +477,25 @@ class SubtokensEvaluationMetric:
         self.nr_predictions: int = 0
         self.filter_impossible_names_fn = filter_impossible_names_fn
 
+        self.precision_total_1: int = 0
+        self.precision_total_2: int = 0
+        self.precision_total_3: int = 0
+        self.precision_total_4: int = 0
+        self.precision_total_5: int = 0
+
+        self.recall_total_1: int = 0
+        self.recall_total_2: int = 0
+        self.recall_total_3: int = 0
+        self.recall_total_4: int = 0
+        self.recall_total_5: int = 0
+
     def update_batch(self, results):
         for original_name, top_words in results:
             prediction = self.filter_impossible_names_fn(top_words)[0]
             original_subtokens = Counter(common.get_subtokens(original_name))
             predicted_subtokens = Counter(common.get_subtokens(prediction))
+            predicted_tokens = list(dict.fromkeys([token for p in top_words for token in common.get_subtokens(p)]))[:10]
+
             self.nr_true_positives += sum(count for element, count in predicted_subtokens.items()
                                           if element in original_subtokens)
             self.nr_false_positives += sum(count for element, count in predicted_subtokens.items()
@@ -467,6 +503,28 @@ class SubtokensEvaluationMetric:
             self.nr_false_negatives += sum(count for element, count in original_subtokens.items()
                                            if element not in predicted_subtokens)
             self.nr_predictions += 1
+
+            original_subtokens_2 = common.get_subtokens(original_name)
+            self.precision_total_1 += sum(1 for element in predicted_tokens[:1]
+                                          if element in original_subtokens_2)
+            self.precision_total_2 += sum(1 for element in predicted_tokens[:2]
+                                          if element in original_subtokens_2)/2.0
+            self.precision_total_3 += sum(1 for element in predicted_tokens[:3]
+                                          if element in original_subtokens_2)/3.0
+            self.precision_total_4 += sum(1 for element in predicted_tokens[:4]
+                                          if element in original_subtokens_2)/4.0
+            self.precision_total_5 += sum(1 for element in predicted_tokens[:5]
+                                          if element in original_subtokens_2)/5.0
+            self.recall_total_1 += sum(1 for element in predicted_tokens[:1]
+                                          if element in original_subtokens_2)/len(original_subtokens_2)
+            self.recall_total_2 += sum(1 for element in predicted_tokens[:2]
+                                          if element in original_subtokens_2)/len(original_subtokens_2)
+            self.recall_total_3 += sum(1 for element in predicted_tokens[:3]
+                                          if element in original_subtokens_2)/len(original_subtokens_2)
+            self.recall_total_4 += sum(1 for element in predicted_tokens[:4]
+                                          if element in original_subtokens_2)/len(original_subtokens_2)
+            self.recall_total_5 += sum(1 for element in predicted_tokens[:5]
+                                          if element in original_subtokens_2)/len(original_subtokens_2)
 
     @property
     def true_positive(self):

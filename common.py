@@ -121,7 +121,8 @@ class common:
 
     @staticmethod
     def legal_method_names_checker(special_words, name):
-        return name != special_words.OOV and re.match(r'^[a-zA-Z|]+$', name)
+        return name != special_words.OOV and True
+        # return name != special_words.OOV and re.match(r'^[a-zA-Z|]+$', name)
 
     @staticmethod
     def filter_impossible_names(special_words, top_words):
