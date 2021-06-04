@@ -10,6 +10,7 @@ from common import common
 from vocabularies import VocabType
 from config import Config
 from model_base import Code2VecModelBase, ModelEvaluationResults, ModelPredictionResults
+import os
 
 
 tf.compat.v1.disable_eager_execution()
@@ -112,6 +113,8 @@ class Code2VecModel(Code2VecModelBase):
         self.log("Training time: %sH:%sM:%sS\n" % ((elapsed // 60 // 60), (elapsed // 60) % 60, elapsed % 60))
 
     def evaluate(self) -> Optional[ModelEvaluationResults]:
+        with open(os.path.dirname(self.config.MODEL_LOAD_PATH) + '/pred_top5.txt', 'w') as top_pred_file, open(os.path.dirname(self.config.MODEL_LOAD_PATH) + '/ref.txt', 'w') as ref_file:
+            pass
         eval_start_time = time.time()
         if self.eval_reader is None:
             self.eval_reader = PathContextReader(vocabs=self.vocabs,
@@ -169,7 +172,7 @@ class Code2VecModel(Code2VecModelBase):
 
                     self._log_predictions_during_evaluation(zip(original_names, top_words), log_output_file)
                     topk_accuracy_evaluation_metric.update_batch(zip(original_names, top_words))
-                    subtokens_evaluation_metric.update_batch(zip(original_names, top_words))
+                    subtokens_evaluation_metric.update_batch(zip(original_names, top_words), os.path.dirname(self.config.MODEL_LOAD_PATH))
 
                     total_predictions += len(original_names)
                     total_prediction_batches += 1
@@ -489,12 +492,15 @@ class SubtokensEvaluationMetric:
         self.recall_total_4: int = 0
         self.recall_total_5: int = 0
 
-    def update_batch(self, results):
+    def update_batch(self, results, directory):
         for original_name, top_words in results:
             prediction = self.filter_impossible_names_fn(top_words)[0]
             original_subtokens = Counter(common.get_subtokens(original_name))
             predicted_subtokens = Counter(common.get_subtokens(prediction))
             predicted_tokens = list(dict.fromkeys([token for p in top_words for token in common.get_subtokens(p)]))[:10]
+            with open(directory + '/pred_top5.txt', 'a') as top_pred_file, open(directory + '/ref.txt', 'a') as ref_file:
+                top_pred_file.write(' '.join(predicted_tokens[:5]) + "\n")
+                ref_file.write(' '.join(original_subtokens) + "\n")
 
             self.nr_true_positives += sum(count for element, count in predicted_subtokens.items()
                                           if element in original_subtokens)
